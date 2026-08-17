@@ -1,0 +1,13 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": { "COD_AC": "DEMO" },
+      "geometry": {
+        "type": "Polygon",
+        "coordinates": [[[9.0995, 45.0995], [9.1007, 45.0995], [9.1007, 45.1007], [9.0995, 45.1007], [9.0995, 45.0995]]]
+      }
+    }
+  ]
+}

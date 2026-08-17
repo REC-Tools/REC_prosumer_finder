@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "description": "Synthetic demo data near the initial test area. Not evidence of real installations.",
+  "elements": [
+    {
+      "type": "way",
+      "id": 910001,
+      "tags": { "building": "industrial", "name": "Edificio demo A", "addr:street": "Via di esempio", "addr:housenumber": "1" },
+      "center": { "lat": 45.1001, "lon": 9.1001 },
+      "geometry": [
+        { "lat": 45.1000, "lon": 9.1000 }, { "lat": 45.1000, "lon": 9.1003 },
+        { "lat": 45.1002, "lon": 9.1003 }, { "lat": 45.1002, "lon": 9.1000 },
+        { "lat": 45.1000, "lon": 9.1000 }
+      ]
+    },
+    {
+      "type": "node",
+      "id": 920001,
+      "lat": 45.1001,
+      "lon": 9.10015,
+      "tags": {
+        "power": "generator", "generator:source": "solar", "generator:method": "photovoltaic",
+        "generator:output:electricity": "48 kW", "generator:solar:modules": "120", "operator": "Demo Energy"
+      }
+    },
+    {
+      "type": "way",
+      "id": 920002,
+      "tags": { "power": "generator", "generator:source": "solar", "generator:method": "photovoltaic" },
+      "center": { "lat": 45.1001, "lon": 9.10015 },
+      "geometry": [
+        { "lat": 45.10004, "lon": 9.10005 }, { "lat": 45.10004, "lon": 9.10025 },
+        { "lat": 45.10012, "lon": 9.10025 }, { "lat": 45.10012, "lon": 9.10005 },
+        { "lat": 45.10004, "lon": 9.10005 }
+      ]
+    }
+  ]
+}
