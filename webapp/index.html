@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="it">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>REC Prosumer Finder</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <aside id="sidebar">
+    <header id="appHeader">
+      <div class="eyebrow">REC-Tools</div>
+      <h1>REC Prosumer Finder</h1>
+      <p>Individua tetti con segnali di impianti fotovoltaici nelle aree di cabina primaria.</p>
+    </header>
+
+    <section class="panel">
+      <h2>Cabina primaria</h2>
+      <p class="hint">Il caso iniziale è già impostato. Inserisci un altro codice GSE per analizzare una cabina diversa.</p>
+      <label for="cabinCode">Codice COD_AC</label>
+      <div class="input-row">
+        <input id="cabinCode" value="AC001E01300" maxlength="11" autocomplete="off" spellcheck="false">
+        <button id="analyzeBtn" class="primary">Analizza</button>
+      </div>
+      <div id="validationMessage" class="validation" aria-live="polite"></div>
+    </section>
+
+    <section class="panel summary-panel">
+      <h2>Riepilogo</h2>
+      <div class="stats">
+        <div><strong id="detectedCount">–</strong><span>tetti rilevati</span></div>
+        <div><strong id="capacityTotal">–</strong><span>kW noti/stimati</span></div>
+        <div><strong id="highConfidenceCount">–</strong><span>confidenza alta</span></div>
+      </div>
+      <p class="hint">Le stime non sostituiscono catasto impianti, sopralluogo o verifica del POD.</p>
+    </section>
+
+    <section class="panel">
+      <h2>Export</h2>
+      <div class="controls-row">
+        <button id="exportCsvBtn" disabled>Scarica CSV</button>
+        <button id="exportGeoJsonBtn" disabled>Scarica GeoJSON</button>
+      </div>
+    </section>
+
+    <section class="panel results-panel">
+      <div class="panel-heading">
+        <h2>Risultati</h2>
+        <select id="confidenceFilter" aria-label="Filtra per confidenza">
+          <option value="all">Tutte</option>
+          <option value="alta">Alta</option>
+          <option value="media">Media</option>
+          <option value="bassa">Bassa</option>
+        </select>
+      </div>
+      <div id="resultsList"><p class="empty">Avvia l’analisi per caricare i risultati.</p></div>
+    </section>
+
+    <div id="status" role="status">Pronto per analizzare AC001E01300.</div>
+  </aside>
+
+  <main id="map" aria-label="Mappa dei tetti fotovoltaici"></main>
+
+  <footer id="appFooter">
+    <span>Fonti: perimetri GSE e dati OpenStreetMap/Overpass</span>
+    <span>Screening preliminare: verificare ogni risultato</span>
+  </footer>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="main.js"></script>
+</body>
+</html>
