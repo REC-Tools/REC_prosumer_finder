@@ -5,9 +5,9 @@ const assert = require('node:assert/strict');
 const { app, isValidCabinCode } = require('../server');
 
 test('validates configurable GSE primary-substation codes', () => {
-  assert.equal(isValidCabinCode('AC001E01300'), true);
-  assert.equal(isValidCabinCode('ac001e01300'), true);
-  assert.equal(isValidCabinCode('01300'), false);
+  assert.equal(isValidCabinCode('AC001E01308'), true);
+  assert.equal(isValidCabinCode('ac001e01884'), true);
+  assert.equal(isValidCabinCode('01308'), false);
 });
 
 test('server exposes configuration and serves the SPA fallback', async t => {
@@ -21,7 +21,8 @@ test('server exposes configuration and serves the SPA fallback', async t => {
   const configResponse = await fetch(`${base}/api/config`);
   assert.equal(configResponse.status, 200);
   const config = await configResponse.json();
-  assert.equal(config.defaultCabinCode, 'AC001E01300');
+  assert.equal(config.defaultCabinCode, 'AC001E01308');
+  assert.deepEqual(config.initialCabins.map(item => item.code), ['AC001E01308', 'AC001E01884']);
 
   const fallback = await fetch(`${base}/percorso-di-prova`);
   assert.equal(fallback.status, 200);

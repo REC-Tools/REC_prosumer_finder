@@ -9,7 +9,7 @@ L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
 let areaLayer = null;
 let resultLayer = null;
 let resultFeatures = [];
-let activeCabinCode = 'AC001E01300';
+let activeCabinCode = 'AC001E01308';
 const layersById = new Map();
 
 function byId(id) { return document.getElementById(id); }
@@ -27,6 +27,25 @@ function setStatus(message, state = '') {
 }
 function validateCabinCode(value) {
   return /^AC\d{3}[A-Z]\d{5}$/.test(String(value || '').trim().toUpperCase());
+}
+
+function renderQuickCabins(cabins) {
+  const container = byId('quickCabins');
+  container.innerHTML = '';
+  (cabins || []).forEach(cabin => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.textContent = cabin.code;
+    button.title = cabin.label || cabin.code;
+    button.classList.toggle('active', cabin.code === activeCabinCode);
+    button.addEventListener('click', () => {
+      activeCabinCode = cabin.code;
+      byId('cabinCode').value = cabin.code;
+      container.querySelectorAll('button').forEach(item => item.classList.toggle('active', item === button));
+      analyze();
+    });
+    container.appendChild(button);
+  });
 }
 async function fetchJson(url, options) {
   const response = await fetch(url, options);
@@ -139,10 +158,13 @@ async function analyze() {
   input.value = code;
   byId('validationMessage').textContent = '';
   if (!validateCabinCode(code)) {
-    byId('validationMessage').textContent = 'Formato non valido. Esempio: AC001E01300.';
+    byId('validationMessage').textContent = 'Formato non valido. Esempio: AC001E01308.';
     return;
   }
   activeCabinCode = code;
+  byId('quickCabins').querySelectorAll('button').forEach(button => {
+    button.classList.toggle('active', button.textContent === code);
+  });
   clearMapResults();
   byId('analyzeBtn').disabled = true;
   setStatus(`Carico il perimetro ufficiale GSE di ${code}…`, 'loading');
@@ -202,6 +224,7 @@ document.addEventListener('DOMContentLoaded', async () => {
     const config = await fetchJson('/api/config');
     activeCabinCode = config.defaultCabinCode || activeCabinCode;
     byId('cabinCode').value = activeCabinCode;
+    renderQuickCabins(config.initialCabins);
     setStatus(`Pronto per analizzare ${activeCabinCode}${config.useMockOsm ? ' in modalità demo' : ''}.`);
   } catch (_) { /* The hard-coded test code remains usable. */ }
   byId('analyzeBtn').addEventListener('click', analyze);
