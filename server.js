@@ -11,6 +11,7 @@ const {
   buildPhotovoltaicQuery,
   convertOverpassElements
 } = require('./lib/prosumer');
+const { loadCatalog, listSources, fetchTernaCapacity } = require('./lib/national-data');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
@@ -168,6 +169,39 @@ app.get('/api/config', (req, res) => {
     useMockOsm,
     useMockGse
   });
+});
+
+app.get('/api/national-data-sources', (req, res) => {
+  try {
+    const catalog = loadCatalog();
+    const sources = listSources({
+      authority: req.query.authority,
+      integrationStatus: req.query.integrationStatus,
+      access: req.query.access
+    }, catalog);
+    res.json({ schemaVersion: catalog.schemaVersion, reviewedAt: catalog.reviewedAt, sources });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+app.get('/api/terna-capacity', async (req, res) => {
+  if (!process.env.TERNA_ACCESS_TOKEN) {
+    return res.status(503).json({ error: 'Integrazione Terna non configurata: impostare TERNA_ACCESS_TOKEN.' });
+  }
+  try {
+    const records = await fetchTernaCapacity({
+      year: req.query.year,
+      region: req.query.region,
+      province: req.query.province,
+      source: req.query.source,
+      capacityType: req.query.capacityType
+    }, { token: process.env.TERNA_ACCESS_TOKEN });
+    res.json({ records, meta: { source: 'Terna Renewable Source Capacity API', aggregateOnly: true } });
+  } catch (error) {
+    const status = /non valido|Anno Terna/.test(error.message) ? 400 : 502;
+    res.status(status).json({ error: error.message });
+  }
 });
 
 app.get('/api/gse-area', async (req, res) => {

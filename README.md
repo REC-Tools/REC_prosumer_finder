@@ -89,6 +89,8 @@ Il punteggio 0–100 ordina la longlist, ma non è una probabilità statistica.
 ## API
 
 - `GET /api/config` — configurazione pubblica della web app;
+- `GET /api/national-data-sources` — catalogo verificato delle fonti GSE, Terna/GAUDÌ e open data;
+- `GET /api/terna-capacity` — aggregati FER ufficiali Terna (richiede `TERNA_ACCESS_TOKEN` OAuth);
 - `GET /api/gse-area?code=AC001E01308` — perimetro ufficiale GeoJSON;
 - `POST /api/pv-search` — ricerca FV, con body `{ "cabinCode": "...", "geometry": { ... } }`;
 - `GET /api/health` — controllo di disponibilità.
@@ -98,6 +100,9 @@ Il punteggio 0–100 ordina la longlist, ma non è una probabilità statistica.
 ```text
 REC_prosumer_finder/
 ├── lib/prosumer.js          # query, geometria, matching, scoring e deduplicazione
+├── lib/national-data.js     # catalogo fonti e adapter aggregati Terna
+├── config/                  # metadati machine-readable delle fonti nazionali
+├── docs/                    # cabine configurate e ricognizione dati nazionali
 ├── tests/                   # test unitari e di avvio API
 ├── webapp/
 │   ├── data/pv-mock.json    # dati sintetici per demo
@@ -127,6 +132,8 @@ npm test
 ```
 
 I test verificano sintassi, costruzione della query Overpass, parsing della potenza, associazione impianto-tetto, deduplicazione per edificio, validazione del `COD_AC` e avvio reale del server. Le chiamate live a GSE/Overpass non fanno parte della CI per evitare test instabili dipendenti da servizi esterni.
+
+La CI GitHub Actions esegue `npm ci` e l'intera suite su Node.js 22 e 24 a ogni push, pull request e avvio manuale. La ricognizione di GSE, Terna/GAUDÌ e cataloghi open data, inclusi granularità e vincoli di accesso, è in [`docs/national-data-sources.md`](docs/national-data-sources.md).
 
 Per uno smoke test esplicito sui servizi reali:
 

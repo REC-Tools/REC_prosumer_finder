@@ -38,3 +38,24 @@ test('search endpoint rejects invalid input without external requests', async t 
   });
   assert.equal(response.status, 400);
 });
+
+test('server exposes the reviewed national source catalog', async t => {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const base = `http://127.0.0.1:${server.address().port}`;
+  const response = await fetch(`${base}/api/national-data-sources?authority=Terna`);
+  assert.equal(response.status, 200);
+  const body = await response.json();
+  assert.ok(body.sources.length >= 3);
+  assert.ok(body.sources.every(source => source.authority === 'Terna'));
+});
+
+test('Terna proxy fails safely when OAuth is not configured', async t => {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/terna-capacity?year=2025`);
+  assert.equal(response.status, 503);
+  assert.match((await response.json()).error, /TERNA_ACCESS_TOKEN/);
+});

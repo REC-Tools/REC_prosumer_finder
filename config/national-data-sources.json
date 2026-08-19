@@ -1,0 +1,74 @@
+{
+  "schemaVersion": 1,
+  "reviewedAt": "2026-08-19",
+  "sources": [
+    {
+      "id": "gse-primary-substation-areas",
+      "authority": "GSE",
+      "name": "Aree convenzionali delle cabine primarie",
+      "coverage": "Italia",
+      "granularity": "perimetro cabina primaria",
+      "access": "public-arcgis",
+      "integrationStatus": "integrated",
+      "officialUrl": "https://www.gse.it/servizi-per-te/autoconsumo/mappa-interattiva-delle-cabine-primarie",
+      "notes": "Usata per delimitare la ricerca; non contiene l'anagrafica degli impianti."
+    },
+    {
+      "id": "gse-atlaimpianti",
+      "authority": "GSE",
+      "name": "ATLAIMPIANTI",
+      "coverage": "Italia",
+      "granularity": "impianto incentivato o servito dal GSE",
+      "access": "public-portal-no-stable-api",
+      "integrationStatus": "manual-import-candidate",
+      "officialUrl": "https://www.gse.it/dati-e-scenari/atlaimpianti",
+      "documentationUrl": "https://www.gse.it/Dati-e-Scenari_site/atlaimpianti_site/Documents/Guida%20atlaimpianti.pdf",
+      "notes": "Include ubicazione, potenza, fonte e tecnologia per un insieme significativo ma non totale degli impianti GSE. Verificare termini d'uso prima di automatizzare export o download."
+    },
+    {
+      "id": "terna-gaudi",
+      "authority": "Terna",
+      "name": "GAUDÌ - Gestione Anagrafica Unica degli Impianti",
+      "coverage": "Italia",
+      "granularity": "impianto e unità di produzione",
+      "access": "authenticated-portal",
+      "integrationStatus": "restricted-reference",
+      "officialUrl": "https://gaudi.terna.it/s/public",
+      "notes": "È l'anagrafe nazionale univoca. Non è trattata come open data e non deve essere acquisita tramite scraping; un'integrazione richiede credenziali, autorizzazione e valutazione privacy."
+    },
+    {
+      "id": "terna-renewable-capacity-api",
+      "authority": "Terna",
+      "name": "Renewable Source Capacity API",
+      "coverage": "Italia",
+      "granularity": "anno, regione, provincia e fonte",
+      "access": "oauth2-api",
+      "integrationStatus": "adapter-ready",
+      "officialUrl": "https://api.terna.it/generation/v2.0/renewable-source-capacity",
+      "documentationUrl": "https://developer.terna.it/docs/read/apis_catalog/generation/Renewable_Source_Capacity",
+      "notes": "Fornisce aggregati ufficiali, non coordinate o identità del singolo impianto. Richiede TERNA_ACCESS_TOKEN."
+    },
+    {
+      "id": "terna-data-portal",
+      "authority": "Terna",
+      "name": "Portale Dati Terna",
+      "coverage": "Italia",
+      "granularity": "serie e statistiche di sistema",
+      "access": "public-download-center",
+      "integrationStatus": "validation-source",
+      "officialUrl": "https://dati.terna.it/",
+      "notes": "Utile per controlli aggregati e trend; non sostituisce GAUDÌ né una fonte geolocalizzata per impianto."
+    },
+    {
+      "id": "national-open-data-catalog",
+      "authority": "AgID/PDND",
+      "name": "Catalogo nazionale dati.gov.it",
+      "coverage": "Italia",
+      "granularity": "metadati di catalogo",
+      "access": "public-catalog",
+      "integrationStatus": "discovery-source",
+      "officialUrl": "https://www.dati.gov.it/",
+      "notes": "Catalogo per scoprire dataset nazionali e territoriali. Provenienza, licenza, aggiornamento e schema vanno verificati sul dataset originario."
+    }
+  ]
+}
