@@ -16,7 +16,11 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const useMockOsm = String(process.env.USE_MOCK_OSM || '').toLowerCase() === 'true';
 const useMockGse = String(process.env.USE_MOCK_GSE || '').toLowerCase() === 'true';
-const defaultCabinCode = String(process.env.DEFAULT_CABIN_CODE || 'AC001E01300').toUpperCase();
+const defaultCabinCode = String(process.env.DEFAULT_CABIN_CODE || 'AC001E01308').toUpperCase();
+const featuredCabins = [
+  { code: 'AC001E01308', label: 'Caso test AC001E01308' },
+  { code: 'AC001E01884', label: 'Cabina AC001E01884' }
+];
 const roofMatchDistanceM = Number(process.env.ROOF_MATCH_DISTANCE_M || 45);
 
 const currentGseLayerUrl = 'https://services-eu1.arcgis.com/sawHMGY9o8rHlY2j/arcgis/rest/services/AC_Comuni_2025/FeatureServer/0';
@@ -154,9 +158,12 @@ async function searchPhotovoltaic(geometry, cabinCode) {
 }
 
 app.get('/api/config', (req, res) => {
+  const initialCabins = featuredCabins.some(item => item.code === defaultCabinCode)
+    ? featuredCabins
+    : [{ code: defaultCabinCode, label: `Cabina predefinita ${defaultCabinCode}` }, ...featuredCabins];
   res.json({
     defaultCabinCode,
-    initialCabins: [{ code: defaultCabinCode, label: `Caso test ${defaultCabinCode}` }],
+    initialCabins,
     roofMatchDistanceM,
     useMockOsm,
     useMockGse
@@ -165,7 +172,7 @@ app.get('/api/config', (req, res) => {
 
 app.get('/api/gse-area', async (req, res) => {
   const code = String(req.query.code || defaultCabinCode).trim().toUpperCase();
-  if (!isValidCabinCode(code)) return res.status(400).json({ error: 'Codice cabina non valido. Formato atteso: AC001E01300.' });
+  if (!isValidCabinCode(code)) return res.status(400).json({ error: 'Codice cabina non valido. Formato atteso: AC001E01308.' });
   try {
     const result = await fetchGseArea(code);
     res.json({ ...result.collection, meta: { code, source: 'GSE/ArcGIS', sourceUrl: result.sourceUrl } });

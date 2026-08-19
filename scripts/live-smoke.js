@@ -4,7 +4,7 @@ const { fetchGseArea, searchPhotovoltaic, isValidCabinCode } = require('../serve
 const { convertOverpassElements } = require('../lib/prosumer');
 
 async function main() {
-  const code = String(process.argv[2] || process.env.DEFAULT_CABIN_CODE || 'AC001E01300').trim().toUpperCase();
+  const code = String(process.argv[2] || process.env.DEFAULT_CABIN_CODE || 'AC001E01308').trim().toUpperCase();
   if (!isValidCabinCode(code)) throw new Error(`Codice cabina non valido: ${code}`);
 
   console.log(`Test live cabina ${code}`);

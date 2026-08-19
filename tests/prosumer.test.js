@@ -47,11 +47,11 @@ test('a photovoltaic generator is associated with its containing roof', () => {
       'generator:output:electricity': '50 kW'
     }
   };
-  const collection = convertOverpassElements([building, generator], { cabinCode: 'AC001E01300' });
+  const collection = convertOverpassElements([building, generator], { cabinCode: 'AC001E01308' });
   assert.equal(collection.length, 1);
   assert.equal(collection[0].properties.building_osm_id, 10);
   assert.equal(collection[0].properties.capacity_kw, 50);
-  assert.equal(collection[0].properties.cabina_cod_ac, 'AC001E01300');
+  assert.equal(collection[0].properties.cabina_cod_ac, 'AC001E01308');
   assert.ok(collection[0].properties.roof_area_m2 > 400);
 });
 
@@ -69,7 +69,7 @@ test('multiple photovoltaic objects on one building produce one roof result', ()
       { lat: 45.00004, lon: 9.00004 }
     ]
   };
-  const collection = convertOverpassElements([building, node, panelArea], { cabinCode: 'AC001E01300' });
+  const collection = convertOverpassElements([building, node, panelArea], { cabinCode: 'AC001E01308' });
   assert.equal(collection.length, 1);
   assert.equal(collection[0].properties.search_id, 'roof:way/10');
   assert.match(collection[0].properties.osm_references, /node\/21/);

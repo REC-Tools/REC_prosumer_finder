@@ -2,7 +2,7 @@
 
 Web app per lo screening preliminare di **tetti con segnali di impianti fotovoltaici** all'interno delle aree di cabina primaria italiane. Il progetto fa parte dell'organizzazione [REC-Tools](https://github.com/REC-Tools) e riprende, dove utile, struttura, UX e pipeline di `REC_user_finder`.
 
-Il caso iniziale configurato è la cabina primaria **`AC001E01300`**, ma il codice accetta qualsiasi `COD_AC` valido senza modifiche al sorgente.
+La cabina primaria predefinita è **`AC001E01308`**; **`AC001E01884`** è disponibile come seconda scelta rapida. Il codice accetta inoltre qualsiasi `COD_AC` valido senza modifiche al sorgente.
 
 ## Cosa fa
 
@@ -30,13 +30,13 @@ Aprire `http://localhost:3000`. Se la porta è occupata, il server prova automat
 
 ## Uso
 
-- lasciare `AC001E01300` per il primo test oppure inserire un altro codice nel campo **COD_AC**;
+- lasciare `AC001E01308`, selezionare il pulsante rapido `AC001E01884` oppure inserire un altro codice nel campo **COD_AC**;
 - premere **Analizza**;
 - filtrare i risultati per confidenza;
 - selezionare un risultato per centrare il tetto sulla mappa;
 - esportare la longlist in CSV o GeoJSON.
 
-Il formato accettato è `AC` + tre cifre + una lettera + cinque cifre, per esempio `AC001E01300`.
+Il formato accettato è `AC` + tre cifre + una lettera + cinque cifre, per esempio `AC001E01308`.
 
 ## Modalità demo offline
 
@@ -58,7 +58,7 @@ I dati in `webapp/data/pv-mock.json` sono sintetici e non rappresentano impianti
 
 | Variabile | Default | Uso |
 |---|---:|---|
-| `DEFAULT_CABIN_CODE` | `AC001E01300` | Cabina proposta all'apertura |
+| `DEFAULT_CABIN_CODE` | `AC001E01308` | Cabina proposta all'apertura |
 | `PORT` | `3000` | Porta del server |
 | `USE_MOCK_OSM` | `false` | Usa i dati demo al posto di Overpass |
 | `USE_MOCK_GSE` | `false` | Usa un piccolo perimetro sintetico al posto del layer GSE |
@@ -89,7 +89,7 @@ Il punteggio 0–100 ordina la longlist, ma non è una probabilità statistica.
 ## API
 
 - `GET /api/config` — configurazione pubblica della web app;
-- `GET /api/gse-area?code=AC001E01300` — perimetro ufficiale GeoJSON;
+- `GET /api/gse-area?code=AC001E01308` — perimetro ufficiale GeoJSON;
 - `POST /api/pv-search` — ricerca FV, con body `{ "cabinCode": "...", "geometry": { ... } }`;
 - `GET /api/health` — controllo di disponibilità.
 
@@ -131,10 +131,11 @@ I test verificano sintassi, costruzione della query Overpass, parsing della pote
 Per uno smoke test esplicito sui servizi reali:
 
 ```bash
-npm run test:live -- AC001E01300
+npm run test:live -- AC001E01308
+npm run test:live -- AC001E01884
 ```
 
-La baseline iniziale è documentata in [`docs/test-case-AC001E01300.md`](docs/test-case-AC001E01300.md).
+Le cabine iniziali e la procedura di verifica sono documentate in [`docs/configured-cabins.md`](docs/configured-cabins.md).
 
 ## Licenza
 
