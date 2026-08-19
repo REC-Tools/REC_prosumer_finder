@@ -7,7 +7,8 @@
   "scripts": {
     "start": "node server.js",
     "test:live": "node scripts/live-smoke.js",
-    "test:syntax": "node --check server.js && node --check lib/prosumer.js && node --check lib/national-data.js && node --check webapp/main.js",
+    "validate:cabins:live": "node scripts/validate-cabins-live.js",
+    "test:syntax": "node --check server.js && node --check lib/prosumer.js && node --check lib/national-data.js && node --check lib/cabins.js && node --check scripts/validate-cabins-live.js && node --check webapp/main.js",
     "test:unit": "node --test tests/*.test.js",
     "test": "npm run test:syntax && npm run test:unit"
   },

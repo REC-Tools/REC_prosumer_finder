@@ -2,13 +2,7 @@
 
 const test = require('node:test');
 const assert = require('node:assert/strict');
-const { app, isValidCabinCode } = require('../server');
-
-test('validates configurable GSE primary-substation codes', () => {
-  assert.equal(isValidCabinCode('AC001E01308'), true);
-  assert.equal(isValidCabinCode('ac001e01884'), true);
-  assert.equal(isValidCabinCode('01308'), false);
-});
+const { app } = require('../server');
 
 test('server exposes configuration and serves the SPA fallback', async t => {
   const server = app.listen(0, '127.0.0.1');
@@ -22,7 +16,10 @@ test('server exposes configuration and serves the SPA fallback', async t => {
   assert.equal(configResponse.status, 200);
   const config = await configResponse.json();
   assert.equal(config.defaultCabinCode, 'AC001E01308');
-  assert.deepEqual(config.initialCabins.map(item => item.code), ['AC001E01308', 'AC001E01884']);
+  assert.deepEqual(config.initialCabins.map(item => item.code), [
+    'AC001E01295', 'AC001E01306', 'AC009E00003',
+    'AC001E01305', 'AC001E01308', 'AC001E01884'
+  ]);
 
   const fallback = await fetch(`${base}/percorso-di-prova`);
   assert.equal(fallback.status, 200);

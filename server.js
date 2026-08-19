@@ -12,16 +12,14 @@ const {
   convertOverpassElements
 } = require('./lib/prosumer');
 const { loadCatalog, listSources, fetchTernaCapacity } = require('./lib/national-data');
+const { isValidCabinCode, featuredCabins } = require('./lib/cabins');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const useMockOsm = String(process.env.USE_MOCK_OSM || '').toLowerCase() === 'true';
 const useMockGse = String(process.env.USE_MOCK_GSE || '').toLowerCase() === 'true';
 const defaultCabinCode = String(process.env.DEFAULT_CABIN_CODE || 'AC001E01308').toUpperCase();
-const featuredCabins = [
-  { code: 'AC001E01308', label: 'Caso test AC001E01308' },
-  { code: 'AC001E01884', label: 'Cabina AC001E01884' }
-];
+const configuredCabins = featuredCabins();
 const roofMatchDistanceM = Number(process.env.ROOF_MATCH_DISTANCE_M || 45);
 
 const currentGseLayerUrl = 'https://services-eu1.arcgis.com/sawHMGY9o8rHlY2j/arcgis/rest/services/AC_Comuni_2025/FeatureServer/0';
@@ -38,10 +36,6 @@ const cache = new Map();
 app.use(cors());
 app.use(express.json({ limit: '5mb' }));
 app.use(express.static(path.join(__dirname, 'webapp')));
-
-function isValidCabinCode(value) {
-  return /^AC\d{3}[A-Z]\d{5}$/.test(String(value || '').trim().toUpperCase());
-}
 
 function escapeSqlString(value) {
   return String(value).replace(/'/g, "''");
@@ -159,9 +153,9 @@ async function searchPhotovoltaic(geometry, cabinCode) {
 }
 
 app.get('/api/config', (req, res) => {
-  const initialCabins = featuredCabins.some(item => item.code === defaultCabinCode)
-    ? featuredCabins
-    : [{ code: defaultCabinCode, label: `Cabina predefinita ${defaultCabinCode}` }, ...featuredCabins];
+  const initialCabins = configuredCabins.some(item => item.code === defaultCabinCode)
+    ? configuredCabins
+    : [{ code: defaultCabinCode, label: `Cabina predefinita ${defaultCabinCode}` }, ...configuredCabins];
   res.json({
     defaultCabinCode,
     initialCabins,
