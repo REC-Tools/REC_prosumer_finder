@@ -35,7 +35,9 @@ function renderQuickCabins(cabins) {
   (cabins || []).forEach(cabin => {
     const button = document.createElement('button');
     button.type = 'button';
-    button.textContent = cabin.code;
+    button.dataset.code = cabin.code;
+    const municipalityLabel = Array.isArray(cabin.municipalities) ? cabin.municipalities.join('/') : '';
+    button.textContent = municipalityLabel ? `${municipalityLabel} · ${cabin.code}` : cabin.code;
     button.title = cabin.label || cabin.code;
     button.classList.toggle('active', cabin.code === activeCabinCode);
     button.addEventListener('click', () => {
@@ -163,7 +165,7 @@ async function analyze() {
   }
   activeCabinCode = code;
   byId('quickCabins').querySelectorAll('button').forEach(button => {
-    button.classList.toggle('active', button.textContent === code);
+    button.classList.toggle('active', button.dataset.code === code);
   });
   clearMapResults();
   byId('analyzeBtn').disabled = true;
