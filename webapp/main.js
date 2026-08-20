@@ -220,7 +220,7 @@ async function analyze() {
     toggleExports(resultFeatures.length > 0);
     const partialNote = results.meta.partial ? ' Analisi parziale: alcuni tasselli non hanno risposto.' : '';
     setCoverage(results.meta, results.meta.partial ? 'partial' : 'complete');
-    setStatus(`Analisi completata: ${results.meta.photovoltaicElements} segnali FV OSM, ${resultFeatures.length} tetti/impianti aggregati.${partialNote}`,
+    setStatus(`Analisi completata: almeno ${results.meta.photovoltaicElements} segnali FV OSM e ${resultFeatures.length} tetti/impianti mappati.${partialNote}`,
       results.meta.partial ? 'warning' : '');
   } catch (error) {
     setCoverage(null, 'error');

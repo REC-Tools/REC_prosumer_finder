@@ -28,6 +28,7 @@ const requestedDefaultCabinCode = String(process.env.DEFAULT_CABIN_CODE || 'AC00
 const defaultCabinCode = configuredCabinCodes.has(requestedDefaultCabinCode) ? requestedDefaultCabinCode : 'AC001E01308';
 const roofMatchDistanceM = Number(process.env.ROOF_MATCH_DISTANCE_M || 45);
 const overpassTileSizeKm = Number(process.env.OVERPASS_TILE_SIZE_KM || 10);
+const overpassRetryTileSizeKm = Math.max(2, Number(process.env.OVERPASS_RETRY_TILE_SIZE_KM || 5));
 const overpassBuildingBatchSize = Math.max(1, Math.min(25, Number(process.env.OVERPASS_BUILDING_BATCH_SIZE || 12)));
 const overpassRequestDelayMs = Math.max(0, Number(process.env.OVERPASS_REQUEST_DELAY_MS || 150));
 
@@ -170,30 +171,60 @@ async function searchPhotovoltaic(geometry, cabinCode) {
   const normalized = normalizeGeometry(geometry);
   const bounds = geometryBounds(normalized);
   if (!bounds) throw new Error('Geometria cabina non valida');
-  const cacheKey = `osm:v2:${cabinCode}:${overpassTileSizeKm}:${roofMatchDistanceM}`;
+  const cacheKey = `osm:v3:${cabinCode}:${overpassTileSizeKm}:${overpassRetryTileSizeKm}:${roofMatchDistanceM}`;
   const hit = cached(cacheKey);
   if (hit) return hit;
 
   const tiles = splitBounds(bounds, overpassTileSizeKm);
   const photovoltaic = new Map();
   const failedTiles = [];
+  let effectiveTileCount = 0;
   let queryCount = 0;
-  for (let index = 0; index < tiles.length; index += 1) {
+
+  const discoverTile = async (tile, label) => {
+    queryCount += 1;
     try {
-      const elements = await fetchOverpass(buildPhotovoltaicTileQuery(tiles[index]));
-      queryCount += 1;
+      const elements = await fetchOverpass(buildPhotovoltaicTileQuery(tile));
       for (const element of elements) {
         const point = elementPoint(element);
         if (isPhotovoltaicElement(element) && pointInGeometry(point, normalized)) {
           photovoltaic.set(`${element.type}/${element.id}`, element);
         }
       }
+      effectiveTileCount += 1;
+      return;
     } catch (error) {
-      failedTiles.push({ index, error: error.message });
+      const canRetrySmaller = overpassRetryTileSizeKm < overpassTileSizeKm;
+      if (!canRetrySmaller) {
+        effectiveTileCount += 1;
+        failedTiles.push({ index: label, error: error.message });
+        return;
+      }
+      const retryTiles = splitBounds(tile, overpassRetryTileSizeKm, 25);
+      for (let retryIndex = 0; retryIndex < retryTiles.length; retryIndex += 1) {
+        queryCount += 1;
+        effectiveTileCount += 1;
+        try {
+          const retryElements = await fetchOverpass(buildPhotovoltaicTileQuery(retryTiles[retryIndex]));
+          for (const element of retryElements) {
+            const point = elementPoint(element);
+            if (isPhotovoltaicElement(element) && pointInGeometry(point, normalized)) {
+              photovoltaic.set(`${element.type}/${element.id}`, element);
+            }
+          }
+        } catch (retryError) {
+          failedTiles.push({ index: `${label}.${retryIndex}`, error: retryError.message });
+        }
+        if (retryIndex < retryTiles.length - 1) await wait(overpassRequestDelayMs);
+      }
     }
+  };
+
+  for (let index = 0; index < tiles.length; index += 1) {
+    await discoverTile(tiles[index], index);
     if (index < tiles.length - 1) await wait(overpassRequestDelayMs);
   }
-  if (failedTiles.length === tiles.length) {
+  if (failedTiles.length === effectiveTileCount) {
     throw new Error(`Nessun tassello Overpass completato. ${failedTiles.map(item => item.error).join(' | ')}`);
   }
 
@@ -218,7 +249,7 @@ async function searchPhotovoltaic(geometry, cabinCode) {
     queryCount,
     source: 'OpenStreetMap/Overpass',
     cabinCode,
-    tileCount: tiles.length,
+    tileCount: effectiveTileCount,
     failedTiles,
     buildingQueryCount: pointBatches.length,
     buildingFailures,
@@ -238,6 +269,7 @@ app.get('/api/config', (req, res) => {
     initialCabins,
     roofMatchDistanceM,
     overpassTileSizeKm,
+    overpassRetryTileSizeKm,
     useMockOsm,
     useMockGse
   });

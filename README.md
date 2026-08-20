@@ -64,6 +64,7 @@ I dati in `webapp/data/pv-mock.json` sono sintetici e non rappresentano impianti
 | `USE_MOCK_GSE` | `false` | Usa un piccolo perimetro sintetico al posto del layer GSE |
 | `ROOF_MATCH_DISTANCE_M` | `45` | Distanza massima per associare un impianto al tetto vicino |
 | `OVERPASS_TILE_SIZE_KM` | `10` | Lato massimo dei tasselli usati per la discovery FV |
+| `OVERPASS_RETRY_TILE_SIZE_KM` | `5` | Lato dei sotto-tasselli usati per ritentare automaticamente le aree fallite |
 | `OVERPASS_BUILDING_BATCH_SIZE` | `12` | Coordinate FV raggruppate in ogni lookup edifici |
 | `OVERPASS_REQUEST_DELAY_MS` | `150` | Pausa tra richieste sequenziali ai server pubblici |
 | `OVERPASS_URLS` | due endpoint pubblici | Lista separata da virgole di endpoint Overpass |
