@@ -3,7 +3,9 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
 const {
-  buildPhotovoltaicQuery,
+  splitBounds,
+  buildPhotovoltaicTileQuery,
+  buildBuildingLookupQuery,
   isPhotovoltaicElement,
   parsePowerKilowatts,
   convertOverpassElements
@@ -19,12 +21,28 @@ const building = {
   ]
 };
 
-test('the Overpass query targets explicit photovoltaic signals and buildings', () => {
-  const query = buildPhotovoltaicQuery('45.0 9.0 45.1 9.1 45.0 9.0');
+test('photovoltaic discovery uses a compact bounding-box query without buildings', () => {
+  const query = buildPhotovoltaicTileQuery({ south: 45, west: 7, north: 45.1, east: 7.1 });
   assert.match(query, /generator:source/);
   assert.match(query, /photovoltaic/);
   assert.match(query, /roof:material/);
-  assert.match(query, /way\["building"\]\(around\.pv:45\)/);
+  assert.match(query, /bbox:45\.0000000,7\.0000000,45\.1000000,7\.1000000/);
+  assert.match(query, /out body center qt/);
+  assert.doesNotMatch(query, /building|poly:/);
+});
+
+test('large bounds are split into bounded sequential Overpass tiles', () => {
+  const tiles = splitBounds({ south: 45, west: 7, north: 45.25, east: 7.35 }, 10);
+  assert.ok(tiles.length > 1);
+  assert.ok(tiles.length < 25);
+  assert.ok(tiles.every(tile => tile.north > tile.south && tile.east > tile.west));
+});
+
+test('building enrichment is limited to photovoltaic coordinates', () => {
+  const query = buildBuildingLookupQuery([[7.1, 45.1]], 45);
+  assert.match(query, /way\["building"\]\(around:45,45\.1000000,7\.1000000\)/);
+  assert.doesNotMatch(query, /relation/);
+  assert.doesNotMatch(query, /generator:source|poly:/);
 });
 
 test('photovoltaic classification does not accept unrelated generators', () => {

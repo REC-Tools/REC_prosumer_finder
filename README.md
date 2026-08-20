@@ -2,7 +2,7 @@
 
 Web app per lo screening preliminare di **tetti con segnali di impianti fotovoltaici** all'interno delle aree di cabina primaria italiane. Il progetto fa parte dell'organizzazione [REC-Tools](https://github.com/REC-Tools) e riprende, dove utile, struttura, UX e pipeline di `REC_user_finder`.
 
-La cabina primaria predefinita è **`AC001E01308`**. La selezione rapida include tutte le aree GSE 2025 che intersecano **Ceresole Reale** e **Sparone**; il codice accetta inoltre qualsiasi `COD_AC` valido senza modifiche al sorgente.
+La cabina primaria predefinita è **`AC001E01308`**. Questa versione accetta esclusivamente le sei cabine documentate in [`docs/configured-cabins.md`](docs/configured-cabins.md).
 
 ## Cosa fa
 
@@ -30,7 +30,7 @@ Aprire `http://localhost:3000`. Se la porta è occupata, il server prova automat
 
 ## Uso
 
-- lasciare `AC001E01308`, selezionare una delle cabine rapide di Ceresole Reale/Sparone oppure inserire un altro codice nel campo **COD_AC**;
+- lasciare `AC001E01308` oppure selezionare una delle altre cinque cabine rapide;
 - premere **Analizza**;
 - filtrare i risultati per confidenza;
 - selezionare un risultato per centrare il tetto sulla mappa;
@@ -63,6 +63,10 @@ I dati in `webapp/data/pv-mock.json` sono sintetici e non rappresentano impianti
 | `USE_MOCK_OSM` | `false` | Usa i dati demo al posto di Overpass |
 | `USE_MOCK_GSE` | `false` | Usa un piccolo perimetro sintetico al posto del layer GSE |
 | `ROOF_MATCH_DISTANCE_M` | `45` | Distanza massima per associare un impianto al tetto vicino |
+| `OVERPASS_TILE_SIZE_KM` | `10` | Lato massimo dei tasselli usati per la discovery FV |
+| `OVERPASS_RETRY_TILE_SIZE_KM` | `5` | Lato dei sotto-tasselli usati per ritentare automaticamente le aree fallite |
+| `OVERPASS_BUILDING_BATCH_SIZE` | `12` | Coordinate FV raggruppate in ogni lookup edifici |
+| `OVERPASS_REQUEST_DELAY_MS` | `150` | Pausa tra richieste sequenziali ai server pubblici |
 | `OVERPASS_URLS` | due endpoint pubblici | Lista separata da virgole di endpoint Overpass |
 | `GSE_FEATURE_LAYER_URLS` | layer 2025 + fallback | Lista separata da virgole di layer ArcGIS |
 

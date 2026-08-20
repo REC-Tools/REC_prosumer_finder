@@ -6,9 +6,13 @@ const fs = require('fs');
 const path = require('path');
 const {
   normalizeGeometry,
-  outerRings,
-  ringToOverpassPoly,
-  buildPhotovoltaicQuery,
+  geometryBounds,
+  splitBounds,
+  buildPhotovoltaicTileQuery,
+  buildBuildingLookupQuery,
+  isPhotovoltaicElement,
+  elementPoint,
+  pointInGeometry,
   convertOverpassElements
 } = require('./lib/prosumer');
 const { loadCatalog, listSources, fetchTernaCapacity } = require('./lib/national-data');
@@ -18,9 +22,15 @@ const app = express();
 const port = Number(process.env.PORT || 3000);
 const useMockOsm = String(process.env.USE_MOCK_OSM || '').toLowerCase() === 'true';
 const useMockGse = String(process.env.USE_MOCK_GSE || '').toLowerCase() === 'true';
-const defaultCabinCode = String(process.env.DEFAULT_CABIN_CODE || 'AC001E01308').toUpperCase();
 const configuredCabins = featuredCabins();
+const configuredCabinCodes = new Set(configuredCabins.map(cabin => cabin.code));
+const requestedDefaultCabinCode = String(process.env.DEFAULT_CABIN_CODE || 'AC001E01308').trim().toUpperCase();
+const defaultCabinCode = configuredCabinCodes.has(requestedDefaultCabinCode) ? requestedDefaultCabinCode : 'AC001E01308';
 const roofMatchDistanceM = Number(process.env.ROOF_MATCH_DISTANCE_M || 45);
+const overpassTileSizeKm = Number(process.env.OVERPASS_TILE_SIZE_KM || 10);
+const overpassRetryTileSizeKm = Math.max(2, Number(process.env.OVERPASS_RETRY_TILE_SIZE_KM || 5));
+const overpassBuildingBatchSize = Math.max(1, Math.min(25, Number(process.env.OVERPASS_BUILDING_BATCH_SIZE || 12)));
+const overpassRequestDelayMs = Math.max(0, Number(process.env.OVERPASS_REQUEST_DELAY_MS || 150));
 
 const currentGseLayerUrl = 'https://services-eu1.arcgis.com/sawHMGY9o8rHlY2j/arcgis/rest/services/AC_Comuni_2025/FeatureServer/0';
 const modifiedGseLayerUrl = 'https://services-eu1.arcgis.com/sawHMGY9o8rHlY2j/arcgis/rest/services/AC_Comuni_2025/FeatureServer/5';
@@ -123,7 +133,7 @@ async function fetchOverpass(query) {
         method: 'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'User-Agent': 'REC_prosumer_finder/0.1' },
         body: body.toString(),
-        signal: AbortSignal.timeout(65000)
+        signal: AbortSignal.timeout(40000)
       });
       if (!response.ok) {
         failures.push(`${url}: HTTP ${response.status}`);
@@ -138,18 +148,116 @@ async function fetchOverpass(query) {
   throw new Error(`Servizi Overpass non disponibili. ${failures.join(' | ')}`);
 }
 
-async function searchPhotovoltaic(geometry, cabinCode) {
-  if (useMockOsm) return { elements: mockElements(), queryCount: 0, source: 'mock' };
-  const rings = outerRings(geometry);
-  if (!rings.length) throw new Error('Geometria cabina non valida');
+function wait(milliseconds) {
+  return milliseconds > 0 ? new Promise(resolve => setTimeout(resolve, milliseconds)) : Promise.resolve();
+}
+
+function batches(items, size) {
   const groups = [];
-  for (const ring of rings) {
-    const poly = ringToOverpassPoly(ring);
-    if (!poly) continue;
-    groups.push(await fetchOverpass(buildPhotovoltaicQuery(poly, roofMatchDistanceM)));
+  for (let index = 0; index < items.length; index += size) groups.push(items.slice(index, index + size));
+  return groups;
+}
+
+async function searchPhotovoltaic(geometry, cabinCode) {
+  if (useMockOsm) {
+    const elements = mockElements();
+    return {
+      elements, queryCount: 0, source: 'mock', cabinCode,
+      tileCount: 0, failedTiles: [], buildingQueryCount: 0, buildingFailures: [],
+      photovoltaicElements: elements.filter(isPhotovoltaicElement).length,
+      buildingElements: elements.filter(element => element.tags && element.tags.building).length
+    };
   }
-  const elements = Array.from(new Map(groups.flat().map(element => [`${element.type}/${element.id}`, element])).values());
-  return { elements, queryCount: groups.length, source: 'OpenStreetMap/Overpass', cabinCode };
+  const normalized = normalizeGeometry(geometry);
+  const bounds = geometryBounds(normalized);
+  if (!bounds) throw new Error('Geometria cabina non valida');
+  const cacheKey = `osm:v3:${cabinCode}:${overpassTileSizeKm}:${overpassRetryTileSizeKm}:${roofMatchDistanceM}`;
+  const hit = cached(cacheKey);
+  if (hit) return hit;
+
+  const tiles = splitBounds(bounds, overpassTileSizeKm);
+  const photovoltaic = new Map();
+  const failedTiles = [];
+  let effectiveTileCount = 0;
+  let queryCount = 0;
+
+  const discoverTile = async (tile, label) => {
+    queryCount += 1;
+    try {
+      const elements = await fetchOverpass(buildPhotovoltaicTileQuery(tile));
+      for (const element of elements) {
+        const point = elementPoint(element);
+        if (isPhotovoltaicElement(element) && pointInGeometry(point, normalized)) {
+          photovoltaic.set(`${element.type}/${element.id}`, element);
+        }
+      }
+      effectiveTileCount += 1;
+      return;
+    } catch (error) {
+      const canRetrySmaller = overpassRetryTileSizeKm < overpassTileSizeKm;
+      if (!canRetrySmaller) {
+        effectiveTileCount += 1;
+        failedTiles.push({ index: label, error: error.message });
+        return;
+      }
+      const retryTiles = splitBounds(tile, overpassRetryTileSizeKm, 25);
+      for (let retryIndex = 0; retryIndex < retryTiles.length; retryIndex += 1) {
+        queryCount += 1;
+        effectiveTileCount += 1;
+        try {
+          const retryElements = await fetchOverpass(buildPhotovoltaicTileQuery(retryTiles[retryIndex]));
+          for (const element of retryElements) {
+            const point = elementPoint(element);
+            if (isPhotovoltaicElement(element) && pointInGeometry(point, normalized)) {
+              photovoltaic.set(`${element.type}/${element.id}`, element);
+            }
+          }
+        } catch (retryError) {
+          failedTiles.push({ index: `${label}.${retryIndex}`, error: retryError.message });
+        }
+        if (retryIndex < retryTiles.length - 1) await wait(overpassRequestDelayMs);
+      }
+    }
+  };
+
+  for (let index = 0; index < tiles.length; index += 1) {
+    await discoverTile(tiles[index], index);
+    if (index < tiles.length - 1) await wait(overpassRequestDelayMs);
+  }
+  if (failedTiles.length === effectiveTileCount) {
+    throw new Error(`Nessun tassello Overpass completato. ${failedTiles.map(item => item.error).join(' | ')}`);
+  }
+
+  const points = Array.from(photovoltaic.values()).map(elementPoint).filter(Boolean);
+  const buildings = new Map();
+  const buildingFailures = [];
+  const pointBatches = batches(points, overpassBuildingBatchSize);
+  for (let index = 0; index < pointBatches.length; index += 1) {
+    try {
+      const elements = await fetchOverpass(buildBuildingLookupQuery(pointBatches[index], roofMatchDistanceM));
+      queryCount += 1;
+      for (const element of elements) buildings.set(`${element.type}/${element.id}`, element);
+    } catch (error) {
+      buildingFailures.push({ index, error: error.message });
+    }
+    if (index < pointBatches.length - 1) await wait(overpassRequestDelayMs);
+  }
+
+  const elements = [...photovoltaic.values(), ...buildings.values()];
+  const result = {
+    elements,
+    queryCount,
+    source: 'OpenStreetMap/Overpass',
+    cabinCode,
+    tileCount: effectiveTileCount,
+    failedTiles,
+    buildingQueryCount: pointBatches.length,
+    buildingFailures,
+    photovoltaicElements: photovoltaic.size,
+    buildingElements: buildings.size
+  };
+  if (!failedTiles.length && !buildingFailures.length) remember(cacheKey, result, 6 * 60 * 60 * 1000);
+  return result;
 }
 
 app.get('/api/config', (req, res) => {
@@ -160,6 +268,8 @@ app.get('/api/config', (req, res) => {
     defaultCabinCode,
     initialCabins,
     roofMatchDistanceM,
+    overpassTileSizeKm,
+    overpassRetryTileSizeKm,
     useMockOsm,
     useMockGse
   });
@@ -201,6 +311,7 @@ app.get('/api/terna-capacity', async (req, res) => {
 app.get('/api/gse-area', async (req, res) => {
   const code = String(req.query.code || defaultCabinCode).trim().toUpperCase();
   if (!isValidCabinCode(code)) return res.status(400).json({ error: 'Codice cabina non valido. Formato atteso: AC001E01308.' });
+  if (!configuredCabinCodes.has(code)) return res.status(400).json({ error: 'Cabina non configurata in questa versione.' });
   try {
     const result = await fetchGseArea(code);
     res.json({ ...result.collection, meta: { code, source: 'GSE/ArcGIS', sourceUrl: result.sourceUrl } });
@@ -213,6 +324,7 @@ app.post('/api/pv-search', async (req, res) => {
   const cabinCode = String(req.body && req.body.cabinCode || '').trim().toUpperCase();
   const geometry = normalizeGeometry(req.body && req.body.geometry);
   if (!isValidCabinCode(cabinCode)) return res.status(400).json({ error: 'Codice cabina non valido.' });
+  if (!configuredCabinCodes.has(cabinCode)) return res.status(400).json({ error: 'Cabina non configurata in questa versione.' });
   if (!geometry) return res.status(400).json({ error: 'Geometria Polygon o MultiPolygon richiesta.' });
   try {
     const raw = await searchPhotovoltaic(geometry, cabinCode);
@@ -224,6 +336,13 @@ app.post('/api/pv-search', async (req, res) => {
         cabinCode,
         source: raw.source,
         queryCount: raw.queryCount,
+        tileCount: raw.tileCount,
+        failedTiles: raw.failedTiles,
+        buildingQueryCount: raw.buildingQueryCount,
+        buildingFailures: raw.buildingFailures,
+        photovoltaicElements: raw.photovoltaicElements,
+        buildingElements: raw.buildingElements,
+        partial: Boolean((raw.failedTiles && raw.failedTiles.length) || (raw.buildingFailures && raw.buildingFailures.length)),
         rawElements: raw.elements.length,
         detectedPhotovoltaic: features.length,
         generatedAt: new Date().toISOString()

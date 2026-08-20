@@ -18,7 +18,8 @@ async function main() {
 
   const raw = await searchPhotovoltaic(geometry, code);
   const features = convertOverpassElements(raw.elements, { cabinCode: code });
-  console.log(`Overpass: ${raw.elements.length} elementi grezzi, ${features.length} tetti/impianti aggregati`);
+  console.log(`Overpass: ${raw.tileCount} tasselli (${raw.failedTiles.length} falliti), ${raw.photovoltaicElements} segnali FV, ${raw.buildingElements} edifici, ${features.length} risultati aggregati`);
+  if (raw.buildingFailures.length) console.log(`Lookup edifici parziali: ${raw.buildingFailures.length} batch falliti`);
   for (const feature of features) {
     const p = feature.properties;
     console.log(`- ${p.search_id}: ${p.confidence}, ${p.capacity_kw || 'n.d.'} kW, ${p.evidence}`);

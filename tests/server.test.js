@@ -17,8 +17,8 @@ test('server exposes configuration and serves the SPA fallback', async t => {
   const config = await configResponse.json();
   assert.equal(config.defaultCabinCode, 'AC001E01308');
   assert.deepEqual(config.initialCabins.map(item => item.code), [
-    'AC001E01295', 'AC001E01306', 'AC009E00003',
-    'AC001E01305', 'AC001E01308', 'AC001E01884'
+    'AC001E01298', 'AC001E01305', 'AC001E01307',
+    'AC001E01308', 'AC001E01306', 'AC001E01884'
   ]);
 
   const fallback = await fetch(`${base}/percorso-di-prova`);
@@ -34,6 +34,15 @@ test('search endpoint rejects invalid input without external requests', async t 
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ cabinCode: 'bad' })
   });
   assert.equal(response.status, 400);
+});
+
+test('server rejects valid but non-configured cabin codes', async t => {
+  const server = app.listen(0, '127.0.0.1');
+  await new Promise(resolve => server.once('listening', resolve));
+  t.after(() => new Promise(resolve => server.close(resolve)));
+  const response = await fetch(`http://127.0.0.1:${server.address().port}/api/gse-area?code=AC001E99999`);
+  assert.equal(response.status, 400);
+  assert.match((await response.json()).error, /non configurata/);
 });
 
 test('server exposes the reviewed national source catalog', async t => {
