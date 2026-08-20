@@ -17,7 +17,7 @@
 
     <section class="panel">
       <h2>Cabina primaria</h2>
-      <p class="hint">Scegli un'area di Ceresole Reale o Sparone, oppure inserisci un altro codice GSE.</p>
+      <p class="hint">Scegli una delle sei cabine configurate. La ricerca è limitata intenzionalmente a questo perimetro operativo.</p>
       <label for="cabinCode">Codice COD_AC</label>
       <div class="input-row">
         <input id="cabinCode" value="AC001E01308" maxlength="11" autocomplete="off" spellcheck="false">
@@ -27,12 +27,20 @@
       <div id="validationMessage" class="validation" aria-live="polite"></div>
     </section>
 
-    <section class="panel summary-panel">
-      <h2>Riepilogo</h2>
+    <section class="panel summary-panel" aria-labelledby="summaryTitle">
+      <div class="panel-heading">
+        <h2 id="summaryTitle">Esito dell’analisi</h2>
+        <span id="coverageBadge" class="coverage-badge idle">In attesa</span>
+      </div>
       <div class="stats">
-        <div><strong id="detectedCount">–</strong><span>tetti rilevati</span></div>
+        <div><strong id="rawSignalCount">–</strong><span>segnali FV OSM</span></div>
+        <div><strong id="detectedCount">–</strong><span>risultati aggregati</span></div>
         <div><strong id="capacityTotal">–</strong><span>kW noti/stimati</span></div>
         <div><strong id="highConfidenceCount">–</strong><span>confidenza alta</span></div>
+      </div>
+      <div class="coverage-row">
+        <span id="tileCoverage">Tasselli Overpass: –</span>
+        <span id="buildingCoverage">Ricerca tetti: –</span>
       </div>
       <p class="hint">Le stime non sostituiscono catasto impianti, sopralluogo o verifica del POD.</p>
     </section>
@@ -58,10 +66,17 @@
       <div id="resultsList"><p class="empty">Avvia l’analisi per caricare i risultati.</p></div>
     </section>
 
-    <div id="status" role="status">Pronto per analizzare AC001E01308.</div>
+    <div id="status" role="status"><span class="status-dot" aria-hidden="true"></span><span id="statusText">Pronto per analizzare AC001E01308.</span></div>
   </aside>
 
   <main id="map" aria-label="Mappa dei tetti fotovoltaici"></main>
+  <div id="mapLegend" aria-label="Legenda mappa">
+    <strong>Legenda</strong>
+    <span><i class="legend-line"></i> Perimetro cabina GSE</span>
+    <span><i class="legend-dot high"></i> Confidenza alta</span>
+    <span><i class="legend-dot medium"></i> Confidenza media</span>
+    <span><i class="legend-dot low"></i> Confidenza bassa</span>
+  </div>
 
   <footer id="appFooter">
     <span>Fonti: perimetri GSE e dati OpenStreetMap/Overpass</span>

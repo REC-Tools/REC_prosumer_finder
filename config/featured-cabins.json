@@ -1,19 +1,13 @@
 {
-  "schemaVersion": 1,
-  "reviewedAt": "2026-08-19",
+  "schemaVersion": 2,
+  "reviewedAt": "2026-08-20",
   "source": "https://services-eu1.arcgis.com/sawHMGY9o8rHlY2j/arcgis/rest/services/AC_Comuni_2025/FeatureServer",
-  "municipalities": [
-    {
-      "name": "Ceresole Reale",
-      "istatCode": "001073",
-      "centroidCabinCode": "AC001E01306",
-      "cabinCodes": ["AC001E01295", "AC001E01306", "AC009E00003"]
-    },
-    {
-      "name": "Sparone",
-      "istatCode": "001267",
-      "centroidCabinCode": "AC001E01884",
-      "cabinCodes": ["AC001E01305", "AC001E01308", "AC001E01884"]
-    }
+  "cabins": [
+    { "code": "AC001E01298", "label": "Cabina AC001E01298" },
+    { "code": "AC001E01305", "label": "Cabina AC001E01305" },
+    { "code": "AC001E01307", "label": "Cabina AC001E01307" },
+    { "code": "AC001E01308", "label": "Cabina AC001E01308" },
+    { "code": "AC001E01306", "label": "Cabina AC001E01306" },
+    { "code": "AC001E01884", "label": "Cabina AC001E01884" }
   ]
 }

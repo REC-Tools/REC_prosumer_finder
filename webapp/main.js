@@ -10,6 +10,7 @@ let areaLayer = null;
 let resultLayer = null;
 let resultFeatures = [];
 let activeCabinCode = 'AC001E01308';
+let allowedCabinCodes = new Set(['AC001E01308']);
 const layersById = new Map();
 
 function byId(id) { return document.getElementById(id); }
@@ -22,8 +23,32 @@ function formatNumber(value, digits = 0) {
 }
 function setStatus(message, state = '') {
   const status = byId('status');
-  status.textContent = message;
+  byId('statusText').textContent = message;
   status.className = state;
+}
+function setCoverage(meta = null, state = 'idle') {
+  const badge = byId('coverageBadge');
+  const labels = { idle: 'In attesa', loading: 'Analisi…', complete: 'Completa', partial: 'Parziale', error: 'Errore' };
+  badge.textContent = meta && meta.source === 'mock' ? 'Demo' : (labels[state] || labels.idle);
+  badge.className = `coverage-badge ${state}`;
+  if (!meta) {
+    byId('rawSignalCount').textContent = '–';
+    byId('tileCoverage').textContent = 'Tasselli Overpass: –';
+    byId('buildingCoverage').textContent = 'Ricerca tetti: –';
+    return;
+  }
+  if (meta.source === 'mock') {
+    byId('rawSignalCount').textContent = formatNumber(meta.photovoltaicElements || 0);
+    byId('tileCoverage').textContent = 'Tasselli Overpass: demo';
+    byId('buildingCoverage').textContent = 'Ricerca tetti: demo';
+    return;
+  }
+  const failedTiles = Array.isArray(meta.failedTiles) ? meta.failedTiles.length : 0;
+  const completedTiles = Math.max(0, Number(meta.tileCount || 0) - failedTiles);
+  const buildingFailures = Array.isArray(meta.buildingFailures) ? meta.buildingFailures.length : 0;
+  byId('rawSignalCount').textContent = formatNumber(meta.photovoltaicElements || 0);
+  byId('tileCoverage').textContent = `Tasselli Overpass: ${completedTiles}/${meta.tileCount || 0}`;
+  byId('buildingCoverage').textContent = `Ricerca tetti: ${Math.max(0, Number(meta.buildingQueryCount || 0) - buildingFailures)}/${meta.buildingQueryCount || 0}`;
 }
 function validateCabinCode(value) {
   return /^AC\d{3}[A-Z]\d{5}$/.test(String(value || '').trim().toUpperCase());
@@ -32,12 +57,12 @@ function validateCabinCode(value) {
 function renderQuickCabins(cabins) {
   const container = byId('quickCabins');
   container.innerHTML = '';
+  allowedCabinCodes = new Set((cabins || []).map(cabin => cabin.code));
   (cabins || []).forEach(cabin => {
     const button = document.createElement('button');
     button.type = 'button';
     button.dataset.code = cabin.code;
-    const municipalityLabel = Array.isArray(cabin.municipalities) ? cabin.municipalities.join('/') : '';
-    button.textContent = municipalityLabel ? `${municipalityLabel} · ${cabin.code}` : cabin.code;
+    button.textContent = cabin.code;
     button.title = cabin.label || cabin.code;
     button.classList.toggle('active', cabin.code === activeCabinCode);
     button.addEventListener('click', () => {
@@ -65,6 +90,7 @@ function clearMapResults() {
   resultFeatures = [];
   layersById.clear();
   renderSummary([]);
+  setCoverage();
   renderList([]);
   toggleExports(false);
 }
@@ -163,12 +189,17 @@ async function analyze() {
     byId('validationMessage').textContent = 'Formato non valido. Esempio: AC001E01308.';
     return;
   }
+  if (!allowedCabinCodes.has(code)) {
+    byId('validationMessage').textContent = 'Cabina non configurata: scegliere uno dei sei codici disponibili.';
+    return;
+  }
   activeCabinCode = code;
   byId('quickCabins').querySelectorAll('button').forEach(button => {
     button.classList.toggle('active', button.dataset.code === code);
   });
   clearMapResults();
   byId('analyzeBtn').disabled = true;
+  setCoverage(null, 'loading');
   setStatus(`Carico il perimetro ufficiale GSE di ${code}…`, 'loading');
   try {
     const area = await fetchJson(`/api/gse-area?code=${encodeURIComponent(code)}`);
@@ -187,8 +218,12 @@ async function analyze() {
     renderSummary(resultFeatures);
     renderList(visibleFeatures());
     toggleExports(resultFeatures.length > 0);
-    setStatus(`Analisi completata: ${resultFeatures.length} tetti/impianti da verificare. Fonte target: ${results.meta.source}.`);
+    const partialNote = results.meta.partial ? ' Analisi parziale: alcuni tasselli non hanno risposto.' : '';
+    setCoverage(results.meta, results.meta.partial ? 'partial' : 'complete');
+    setStatus(`Analisi completata: ${results.meta.photovoltaicElements} segnali FV OSM, ${resultFeatures.length} tetti/impianti aggregati.${partialNote}`,
+      results.meta.partial ? 'warning' : '');
   } catch (error) {
+    setCoverage(null, 'error');
     setStatus(error.message, 'error');
   } finally {
     byId('analyzeBtn').disabled = false;
