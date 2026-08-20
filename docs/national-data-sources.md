@@ -1,11 +1,12 @@
 # Fonti nazionali per impianti fotovoltaici e altre FER
 
-Verifica effettuata il **19 agosto 2026** sui portali ufficiali. Il catalogo machine-readable è in `config/national-data-sources.json`.
+Verifica aggiornata il **20 agosto 2026** sui portali ufficiali. Il catalogo machine-readable è in `config/national-data-sources.json`.
 
 ## Esito della ricognizione
 
 | Fonte | Cosa offre | Accesso | Uso nel progetto |
 |---|---|---|---|
+| Città Metropolitana di Torino, impianti FER autorizzati | coordinate, comune, indirizzo, data autorizzazione e tecnologia | Shapefile pubblico, CC BY 4.0 | integrato: download in memoria, filtro per cabina e fusione con OSM |
 | GSE, aree cabine primarie | perimetri ufficiali `COD_AC` | layer ArcGIS pubblico | già integrato per delimitare la ricerca |
 | GSE, ATLAIMPIANTI | ubicazione, fonte, tecnologia e potenza degli impianti incentivati o serviti dal GSE | portale pubblico; nessuna API stabile documentata | candidato a import controllato dopo verifica di termini e formato |
 | Terna, GAUDÌ | anagrafe nazionale univoca di impianti e unità di produzione | portale autenticato | riferimento autorevole; nessuno scraping o import senza autorizzazione |
@@ -14,6 +15,29 @@ Verifica effettuata il **19 agosto 2026** sui portali ufficiali. Il catalogo mac
 | dati.gov.it | metadati di dataset nazionali e territoriali | catalogo pubblico | discovery; verificare sempre la fonte originaria |
 
 ATLAIMPIANTI dichiara esplicitamente che gli impianti mostrati non rappresentano la totalità degli impianti gestiti dal GSE. GAUDÌ è quindi il riferimento anagrafico nazionale, ma non è un dataset aperto utilizzabile anonimamente. Le API Terna pubbliche documentate espongono aggregati territoriali e non coordinate dei singoli impianti.
+
+## Registro FER della Città Metropolitana di Torino
+
+Il dataset `SHP_INT_ENER` contiene 250 localizzazioni puntuali: 53 fotovoltaiche, 144 idroelettriche, 13 a biometano e 40 termoelettriche. L'adapter `lib/cmto-fer.js`:
+
+1. scarica l'archivio ZIP ufficiale con limite di 5 MB;
+2. legge SHP e DBF interamente in memoria;
+3. normalizza i record in GeoJSON con fonte, licenza e data di autorizzazione;
+4. filtra i punti sul Polygon/MultiPolygon GSE;
+5. fonde un fotovoltaico ufficiale con un risultato OSM entro 75 metri, conservando entrambi i riferimenti.
+
+Verifica live sulle sei cabine:
+
+| Cabina | Impianti FER ufficiali |
+|---|---:|
+| `AC001E01298` | 1 fotovoltaico |
+| `AC001E01305` | 2 idroelettrici |
+| `AC001E01307` | 5 idroelettrici |
+| `AC001E01308` | 14 totali, incluso il fotovoltaico di Località Gulaiun a Sparone |
+| `AC001E01306` | 3 idroelettrici |
+| `AC001E01884` | 2 idroelettrici |
+
+Sono autorizzazioni amministrative: non certificano stato di esercizio, produzione attuale o appartenenza a una CER.
 
 ## Adapter Terna
 
@@ -44,6 +68,8 @@ Fonti Terna accettate: `Bioenergie`, `Eolico`, `Fotovoltaico`, `Geotermoelettric
 
 ## Riferimenti ufficiali
 
+- Città Metropolitana di Torino, [download Shapefile impianti FER autorizzati](https://eds.cittametropolitana.torino.it/geoportale/SHP_INT_ENER.php)
+- Geoportale Piemonte, [catalogo metadati](https://www.geoportale.piemonte.it/geonetwork/srv/search?topicCat=environment)
 - GSE, [guida ATLAIMPIANTI](https://www.gse.it/Dati-e-Scenari_site/atlaimpianti_site/Documents/Guida%20atlaimpianti.pdf)
 - Terna, [portale GAUDÌ](https://gaudi.terna.it/s/public)
 - Terna, [Renewable Source Capacity API](https://developer.terna.it/docs/read/apis_catalog/generation/Renewable_Source_Capacity)

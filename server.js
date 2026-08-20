@@ -17,11 +17,14 @@ const {
 } = require('./lib/prosumer');
 const { loadCatalog, listSources, fetchTernaCapacity } = require('./lib/national-data');
 const { isValidCabinCode, featuredCabins } = require('./lib/cabins');
+const { fetchCmtoFer, filterCmtoFeatures, mergeOfficialFeatures, CMTO_FER_URL } = require('./lib/cmto-fer');
 
 const app = express();
 const port = Number(process.env.PORT || 3000);
 const useMockOsm = String(process.env.USE_MOCK_OSM || '').toLowerCase() === 'true';
 const useMockGse = String(process.env.USE_MOCK_GSE || '').toLowerCase() === 'true';
+const useMockCmto = String(process.env.USE_MOCK_CMTO || '').toLowerCase() === 'true' || useMockOsm;
+const cmtoFerEnabled = String(process.env.CMTO_FER_ENABLED || 'true').toLowerCase() !== 'false';
 const configuredCabins = featuredCabins();
 const configuredCabinCodes = new Set(configuredCabins.map(cabin => cabin.code));
 const requestedDefaultCabinCode = String(process.env.DEFAULT_CABIN_CODE || 'AC001E01308').trim().toUpperCase();
@@ -260,6 +263,25 @@ async function searchPhotovoltaic(geometry, cabinCode) {
   return result;
 }
 
+async function searchOfficialFer(geometry, cabinCode) {
+  if (!cmtoFerEnabled) return { features: [], source: 'disabled', totalRecords: 0 };
+  if (useMockCmto) {
+    const collection = JSON.parse(fs.readFileSync(path.join(__dirname, 'webapp', 'data', 'cmto-fer-mock.geojson'), 'utf8'));
+    return { features: filterCmtoFeatures(collection.features, geometry, cabinCode), source: 'mock', totalRecords: collection.features.length };
+  }
+  const cacheKey = 'cmto-fer:v1';
+  let allFeatures = cached(cacheKey);
+  if (!allFeatures) {
+    allFeatures = await fetchCmtoFer();
+    remember(cacheKey, allFeatures, 24 * 60 * 60 * 1000);
+  }
+  return {
+    features: filterCmtoFeatures(allFeatures, geometry, cabinCode),
+    source: 'Città Metropolitana di Torino',
+    totalRecords: allFeatures.length
+  };
+}
+
 app.get('/api/config', (req, res) => {
   const initialCabins = configuredCabins.some(item => item.code === defaultCabinCode)
     ? configuredCabins
@@ -271,7 +293,9 @@ app.get('/api/config', (req, res) => {
     overpassTileSizeKm,
     overpassRetryTileSizeKm,
     useMockOsm,
-    useMockGse
+    useMockGse,
+    useMockCmto,
+    cmtoFerEnabled
   });
 });
 
@@ -327,8 +351,23 @@ app.post('/api/pv-search', async (req, res) => {
   if (!configuredCabinCodes.has(cabinCode)) return res.status(400).json({ error: 'Cabina non configurata in questa versione.' });
   if (!geometry) return res.status(400).json({ error: 'Geometria Polygon o MultiPolygon richiesta.' });
   try {
-    const raw = await searchPhotovoltaic(geometry, cabinCode);
-    const features = convertOverpassElements(raw.elements, { cabinCode, maxRoofDistanceM: roofMatchDistanceM });
+    const [osmOutcome, officialOutcome] = await Promise.allSettled([
+      searchPhotovoltaic(geometry, cabinCode),
+      searchOfficialFer(geometry, cabinCode)
+    ]);
+    if (osmOutcome.status === 'rejected' && officialOutcome.status === 'rejected') {
+      throw new Error(`Fonti impianti non disponibili. OSM: ${osmOutcome.reason.message} | CMTo: ${officialOutcome.reason.message}`);
+    }
+    const raw = osmOutcome.status === 'fulfilled' ? osmOutcome.value : {
+      elements: [], source: 'OpenStreetMap/Overpass', queryCount: 0, tileCount: 0,
+      failedTiles: [{ index: 'all', error: osmOutcome.reason.message }], buildingQueryCount: 0,
+      buildingFailures: [], photovoltaicElements: 0, buildingElements: 0
+    };
+    const official = officialOutcome.status === 'fulfilled' ? officialOutcome.value : {
+      features: [], source: 'Città Metropolitana di Torino', totalRecords: 0, error: officialOutcome.reason.message
+    };
+    const osmFeatures = convertOverpassElements(raw.elements, { cabinCode, maxRoofDistanceM: roofMatchDistanceM });
+    const features = mergeOfficialFeatures(osmFeatures, official.features);
     res.json({
       type: 'FeatureCollection',
       features,
@@ -342,9 +381,15 @@ app.post('/api/pv-search', async (req, res) => {
         buildingFailures: raw.buildingFailures,
         photovoltaicElements: raw.photovoltaicElements,
         buildingElements: raw.buildingElements,
-        partial: Boolean((raw.failedTiles && raw.failedTiles.length) || (raw.buildingFailures && raw.buildingFailures.length)),
+        partial: Boolean((raw.failedTiles && raw.failedTiles.length) || (raw.buildingFailures && raw.buildingFailures.length) || official.error),
         rawElements: raw.elements.length,
         detectedPhotovoltaic: features.length,
+        detectedResults: features.length,
+        osmDetectedPhotovoltaic: osmFeatures.length,
+        officialFerElements: official.features.length,
+        officialFerSource: official.source,
+        officialFerError: official.error || null,
+        officialFerDatasetUrl: CMTO_FER_URL,
         generatedAt: new Date().toISOString()
       }
     });
@@ -374,4 +419,4 @@ function startServer(preferredPort, attempts = 0) {
 
 if (require.main === module) startServer(port);
 
-module.exports = { app, startServer, isValidCabinCode, fetchGseArea, searchPhotovoltaic };
+module.exports = { app, startServer, isValidCabinCode, fetchGseArea, searchPhotovoltaic, searchOfficialFer };

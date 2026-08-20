@@ -1,20 +1,20 @@
 # REC Prosumer Finder
 
-Web app per lo screening preliminare di **tetti con segnali di impianti fotovoltaici** all'interno delle aree di cabina primaria italiane. Il progetto fa parte dell'organizzazione [REC-Tools](https://github.com/REC-Tools) e riprende, dove utile, struttura, UX e pipeline di `REC_user_finder`.
+Web app per lo screening preliminare di **impianti FER autorizzati e tetti con segnali fotovoltaici** all'interno delle aree di cabina primaria italiane. Il progetto fa parte dell'organizzazione [REC-Tools](https://github.com/REC-Tools) e riprende, dove utile, struttura, UX e pipeline di `REC_user_finder`.
 
 La cabina primaria predefinita è **`AC001E01308`**. Questa versione accetta esclusivamente le sei cabine documentate in [`docs/configured-cabins.md`](docs/configured-cabins.md).
 
 ## Cosa fa
 
 1. recupera il perimetro ufficiale della cabina dai layer GSE/ArcGIS;
-2. interroga OpenStreetMap tramite più endpoint Overpass di fallback;
-3. cerca segnali espliciti di fotovoltaico (`generator:source=solar`, `generator:method=photovoltaic`, impianti solari e tetti con pannelli mappati);
-4. associa ogni segnale all'edificio che lo contiene o, entro una soglia configurabile, all'edificio più vicino;
-5. unisce più oggetti OSM riferiti allo stesso tetto per evitare duplicati;
+2. scarica in memoria il registro puntuale CC BY 4.0 degli impianti FER autorizzati dalla Città Metropolitana di Torino;
+3. filtra i punti ufficiali sul perimetro esatto della cabina, senza estrarre file sul server;
+4. interroga OpenStreetMap tramite più endpoint Overpass di fallback e cerca segnali espliciti di fotovoltaico;
+5. associa i segnali OSM agli edifici vicini, deduplica quelli sullo stesso tetto e fonde i riscontri compatibili con il registro ufficiale;
 6. calcola superficie, potenza nota o stimata, punteggio e livello di confidenza;
-7. mostra i risultati su mappa e li esporta in CSV o GeoJSON.
+7. mostra provenienza e autorizzazione sulla mappa ed esporta i risultati unificati in CSV o GeoJSON.
 
-> Il risultato è una longlist tecnica, non un catasto impianti. OpenStreetMap può essere incompleto o non aggiornato. Presenza, potenza, titolarità, POD e requisiti CER vanno verificati prima di qualificare un prosumer.
+> Il risultato è una longlist tecnica, non un catasto impianti in esercizio. Il registro CMTo prova l'autorizzazione, mentre OpenStreetMap può essere incompleto. Presenza attuale, potenza, titolarità, POD e requisiti CER vanno verificati prima di qualificare un prosumer.
 
 ## Avvio locale
 
@@ -43,16 +43,16 @@ Il formato accettato è `AC` + tre cifre + una lettera + cinque cifre, per esemp
 Per provare l'intera pipeline senza chiamare GSE o Overpass:
 
 ```powershell
-$env:USE_MOCK_GSE='true'; $env:USE_MOCK_OSM='true'; npm start
+$env:USE_MOCK_GSE='true'; $env:USE_MOCK_OSM='true'; $env:USE_MOCK_CMTO='true'; npm start
 ```
 
 Su macOS/Linux:
 
 ```bash
-USE_MOCK_GSE=true USE_MOCK_OSM=true npm start
+USE_MOCK_GSE=true USE_MOCK_OSM=true USE_MOCK_CMTO=true npm start
 ```
 
-I dati in `webapp/data/pv-mock.json` sono sintetici e non rappresentano impianti reali.
+I dati in `webapp/data/pv-mock.json` e `webapp/data/cmto-fer-mock.geojson` sono sintetici e non rappresentano impianti reali.
 
 ## Configurazione
 
@@ -62,6 +62,8 @@ I dati in `webapp/data/pv-mock.json` sono sintetici e non rappresentano impianti
 | `PORT` | `3000` | Porta del server |
 | `USE_MOCK_OSM` | `false` | Usa i dati demo al posto di Overpass |
 | `USE_MOCK_GSE` | `false` | Usa un piccolo perimetro sintetico al posto del layer GSE |
+| `USE_MOCK_CMTO` | `false` | Usa un punto FER istituzionale sintetico; viene attivato anche da `USE_MOCK_OSM` |
+| `CMTO_FER_ENABLED` | `true` | Abilita il registro pubblico degli impianti FER autorizzati della Città Metropolitana di Torino |
 | `ROOF_MATCH_DISTANCE_M` | `45` | Distanza massima per associare un impianto al tetto vicino |
 | `OVERPASS_TILE_SIZE_KM` | `10` | Lato massimo dei tasselli usati per la discovery FV |
 | `OVERPASS_RETRY_TILE_SIZE_KM` | `5` | Lato dei sotto-tasselli usati per ritentare automaticamente le aree fallite |
@@ -84,7 +86,7 @@ Le stime sono indicate come tali nell'interfaccia e nell'export. Non viene stima
 
 ## Confidenza
 
-- **alta**: più evidenze OSM, associazione a un tetto e dato geometrico/potenza, oppure più oggetti FV coerenti sullo stesso edificio;
+- **alta**: riscontro nel registro istituzionale CMTo oppure più evidenze OSM coerenti associate allo stesso tetto;
 - **media**: evidenza fotovoltaica esplicita associata a un edificio;
 - **bassa**: segnale fotovoltaico senza associazione affidabile a un tetto.
 
@@ -96,7 +98,7 @@ Il punteggio 0–100 ordina la longlist, ma non è una probabilità statistica.
 - `GET /api/national-data-sources` — catalogo verificato delle fonti GSE, Terna/GAUDÌ e open data;
 - `GET /api/terna-capacity` — aggregati FER ufficiali Terna (richiede `TERNA_ACCESS_TOKEN` OAuth);
 - `GET /api/gse-area?code=AC001E01308` — perimetro ufficiale GeoJSON;
-- `POST /api/pv-search` — ricerca FV, con body `{ "cabinCode": "...", "geometry": { ... } }`;
+- `POST /api/pv-search` — ricerca unificata FER ufficiale + FV OSM, con body `{ "cabinCode": "...", "geometry": { ... } }`;
 - `GET /api/health` — controllo di disponibilità.
 
 ## Struttura
@@ -105,25 +107,26 @@ Il punteggio 0–100 ordina la longlist, ma non è una probabilità statistica.
 REC_prosumer_finder/
 ├── lib/prosumer.js          # query, geometria, matching, scoring e deduplicazione
 ├── lib/national-data.js     # catalogo fonti e adapter aggregati Terna
+├── lib/cmto-fer.js          # download, parsing SHP/DBF, filtro e fusione registro FER CMTo
 ├── config/                  # metadati machine-readable delle fonti nazionali
 ├── docs/                    # cabine configurate e ricognizione dati nazionali
 ├── tests/                   # test unitari e di avvio API
 ├── webapp/
-│   ├── data/pv-mock.json    # dati sintetici per demo
+│   ├── data/                # fixture sintetiche OSM e registro CMTo
 │   ├── index.html
 │   ├── main.js
 │   └── style.css
-├── server.js                # proxy GSE/Overpass e server web
+├── server.js                # proxy GSE/Overpass/CMTo e server web
 └── package.json
 ```
 
 ## Limiti e sviluppi successivi
 
-La prima versione identifica gli impianti **mappati in OpenStreetMap**. Non analizza ancora ortofoto e quindi può produrre falsi negativi. Un'estensione naturale è aggiungere una seconda sorgente di rilevamento da immagini aeree, conservando lo stesso schema GeoJSON e il campo `source`; la pipeline di associazione ai tetti, scoring, mappa ed export può rimanere invariata.
+La pipeline combina ora il registro CMTo degli impianti autorizzati con gli impianti **mappati in OpenStreetMap**. Il registro non include necessariamente piccoli impianti domestici e non prova che un impianto autorizzato sia ancora in esercizio. Non vengono ancora analizzate ortofoto, quindi restano possibili falsi negativi.
 
 Altri sviluppi utili:
 
-- confronto con dati catastali o registri impianti autorizzati;
+- integrazione controllata di export GSE ATLAIMPIANTI o GAUDÌ autorizzati;
 - stima di producibilità da orientamento, inclinazione e irraggiamento;
 - collegamento con consumi/POD per distinguere produttori e prosumer;
 - validazione manuale con stato “confermato/scartato” persistente;
@@ -135,7 +138,7 @@ Altri sviluppi utili:
 npm test
 ```
 
-I test verificano sintassi, costruzione della query Overpass, parsing della potenza, associazione impianto-tetto, deduplicazione per edificio, validazione del `COD_AC` e avvio reale del server. Le chiamate live a GSE/Overpass non fanno parte della CI per evitare test instabili dipendenti da servizi esterni.
+I test verificano sintassi, parser ZIP/SHP/DBF CMTo, filtro geometrico, fusione con OSM, costruzione della query Overpass, parsing della potenza, associazione impianto-tetto, deduplicazione, validazione del `COD_AC` e avvio reale del server. Le chiamate live non fanno parte della CI per evitare test instabili dipendenti da servizi esterni.
 
 La CI GitHub Actions esegue `npm ci` e l'intera suite su Node.js 22 e 24 a ogni push, pull request e avvio manuale. La ricognizione di GSE, Terna/GAUDÌ e cataloghi open data, inclusi granularità e vincoli di accesso, è in [`docs/national-data-sources.md`](docs/national-data-sources.md).
 

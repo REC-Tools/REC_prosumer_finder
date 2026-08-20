@@ -12,7 +12,7 @@
     <header id="appHeader">
       <div class="eyebrow">REC-Tools</div>
       <h1>REC Prosumer Finder</h1>
-      <p>Individua tetti con segnali di impianti fotovoltaici nelle aree di cabina primaria.</p>
+      <p>Individua impianti FER da registri istituzionali e segnali fotovoltaici OSM nelle aree di cabina primaria.</p>
     </header>
 
     <section class="panel">
@@ -34,15 +34,15 @@
       </div>
       <div class="stats">
         <div><strong id="rawSignalCount">–</strong><span>segnali FV OSM (min.)</span></div>
-        <div><strong id="detectedCount">–</strong><span>risultati mappati (min.)</span></div>
+        <div><strong id="officialCount">–</strong><span>impianti FER ufficiali</span></div>
+        <div><strong id="detectedCount">–</strong><span>risultati unificati</span></div>
         <div><strong id="capacityTotal">–</strong><span>kW noti/stimati</span></div>
-        <div><strong id="highConfidenceCount">–</strong><span>confidenza alta</span></div>
       </div>
       <div class="coverage-row">
         <span id="tileCoverage">Tasselli Overpass: –</span>
         <span id="buildingCoverage">Ricerca tetti: –</span>
       </div>
-      <p class="hint">I conteggi sono limiti inferiori basati su OSM, non il totale degli impianti reali. Le stime non sostituiscono catasto, sopralluogo o verifica del POD.</p>
+      <p class="hint">Il registro CMTo certifica l’autorizzazione, non lo stato di esercizio. OSM resta un limite inferiore. Verificare sempre impianto e POD.</p>
     </section>
 
     <section class="panel">
@@ -69,17 +69,18 @@
     <div id="status" role="status"><span class="status-dot" aria-hidden="true"></span><span id="statusText">Pronto per analizzare AC001E01308.</span></div>
   </aside>
 
-  <main id="map" aria-label="Mappa dei tetti fotovoltaici"></main>
+  <main id="map" aria-label="Mappa degli impianti FER e dei tetti fotovoltaici"></main>
   <div id="mapLegend" aria-label="Legenda mappa">
     <strong>Legenda</strong>
     <span><i class="legend-line"></i> Perimetro cabina GSE</span>
-    <span><i class="legend-dot high"></i> Confidenza alta</span>
+    <span><i class="legend-dot official"></i> Registro ufficiale CMTo</span>
+    <span><i class="legend-dot high"></i> Segnale OSM, confidenza alta</span>
     <span><i class="legend-dot medium"></i> Confidenza media</span>
     <span><i class="legend-dot low"></i> Confidenza bassa</span>
   </div>
 
   <footer id="appFooter">
-    <span>Fonti: perimetri GSE e dati OpenStreetMap/Overpass</span>
+    <span>Fonti: GSE, Città Metropolitana di Torino, OpenStreetMap/Overpass</span>
     <span>Screening preliminare: verificare ogni risultato</span>
   </footer>
 

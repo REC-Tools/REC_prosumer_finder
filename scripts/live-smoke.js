@@ -1,7 +1,8 @@
 'use strict';
 
-const { fetchGseArea, searchPhotovoltaic, isValidCabinCode } = require('../server');
+const { fetchGseArea, searchPhotovoltaic, searchOfficialFer, isValidCabinCode } = require('../server');
 const { convertOverpassElements } = require('../lib/prosumer');
+const { mergeOfficialFeatures } = require('../lib/cmto-fer');
 
 async function main() {
   const code = String(process.argv[2] || process.env.DEFAULT_CABIN_CODE || 'AC001E01308').trim().toUpperCase();
@@ -16,9 +17,11 @@ async function main() {
   };
   console.log(`GSE: ${area.collection.features.length} geometria/e da ${area.sourceUrl}`);
 
-  const raw = await searchPhotovoltaic(geometry, code);
-  const features = convertOverpassElements(raw.elements, { cabinCode: code });
-  console.log(`Overpass: ${raw.tileCount} tasselli (${raw.failedTiles.length} falliti), ${raw.photovoltaicElements} segnali FV, ${raw.buildingElements} edifici, ${features.length} risultati aggregati`);
+  const [raw, official] = await Promise.all([searchPhotovoltaic(geometry, code), searchOfficialFer(geometry, code)]);
+  const osmFeatures = convertOverpassElements(raw.elements, { cabinCode: code });
+  const features = mergeOfficialFeatures(osmFeatures, official.features);
+  console.log(`Overpass: ${raw.tileCount} tasselli (${raw.failedTiles.length} falliti), ${raw.photovoltaicElements} segnali FV, ${raw.buildingElements} edifici`);
+  console.log(`CMTo: ${official.features.length} impianti FER ufficiali; totale unificato: ${features.length}`);
   if (raw.buildingFailures.length) console.log(`Lookup edifici parziali: ${raw.buildingFailures.length} batch falliti`);
   for (const feature of features) {
     const p = feature.properties;

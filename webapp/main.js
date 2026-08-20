@@ -33,12 +33,14 @@ function setCoverage(meta = null, state = 'idle') {
   badge.className = `coverage-badge ${state}`;
   if (!meta) {
     byId('rawSignalCount').textContent = '–';
+    byId('officialCount').textContent = '–';
     byId('tileCoverage').textContent = 'Tasselli Overpass: –';
     byId('buildingCoverage').textContent = 'Ricerca tetti: –';
     return;
   }
   if (meta.source === 'mock') {
     byId('rawSignalCount').textContent = formatNumber(meta.photovoltaicElements || 0);
+    byId('officialCount').textContent = formatNumber(meta.officialFerElements || 0);
     byId('tileCoverage').textContent = 'Tasselli Overpass: demo';
     byId('buildingCoverage').textContent = 'Ricerca tetti: demo';
     return;
@@ -47,6 +49,7 @@ function setCoverage(meta = null, state = 'idle') {
   const completedTiles = Math.max(0, Number(meta.tileCount || 0) - failedTiles);
   const buildingFailures = Array.isArray(meta.buildingFailures) ? meta.buildingFailures.length : 0;
   byId('rawSignalCount').textContent = formatNumber(meta.photovoltaicElements || 0);
+  byId('officialCount').textContent = formatNumber(meta.officialFerElements || 0);
   byId('tileCoverage').textContent = `Tasselli Overpass: ${completedTiles}/${meta.tileCount || 0}`;
   byId('buildingCoverage').textContent = `Ricerca tetti: ${Math.max(0, Number(meta.buildingQueryCount || 0) - buildingFailures)}/${meta.buildingQueryCount || 0}`;
 }
@@ -104,18 +107,27 @@ function drawArea(collection) {
 }
 
 function markerStyle(feature) {
+  if (feature.properties.official_registry) {
+    return { color: '#5f3dc4', weight: 3, fillColor: '#d8ccff', fillOpacity: .85, radius: 9 };
+  }
   const confidence = feature.properties.confidence;
   const color = confidence === 'alta' ? '#247a3d' : confidence === 'media' ? '#d18400' : '#667085';
   return { color, weight: 2, fillColor: '#f4b400', fillOpacity: .55, radius: 7 };
 }
 
 function popupHtml(properties) {
+  const officialDetails = properties.official_registry
+    ? `Fonte: <strong>${escapeHtml(properties.source_authority)}</strong><br>` +
+      `${properties.authorization_date ? `Autorizzazione: ${escapeHtml(properties.authorization_date)}<br>` : ''}` +
+      `${properties.company ? `Soggetto: ${escapeHtml(properties.company)}<br>` : ''}`
+    : '';
   return `<strong>${escapeHtml(properties.name)}</strong><br>` +
     `${escapeHtml(properties.detection_type)}<br>` +
     `Confidenza: <strong>${escapeHtml(properties.confidence)}</strong> · score ${escapeHtml(properties.score)}/100<br>` +
     `Potenza: ${escapeHtml(formatNumber(properties.capacity_kw, 1))} kW (${escapeHtml(properties.capacity_source)})<br>` +
     `Area tetto: ${escapeHtml(formatNumber(properties.roof_area_m2))} m²<br>` +
-    `Evidenza OSM: ${escapeHtml(properties.evidence || 'n.d.')}<br>` +
+    `Evidenza: ${escapeHtml(properties.evidence || 'n.d.')}<br>` +
+    officialDetails +
     `${properties.address ? `Indirizzo: ${escapeHtml(properties.address)}<br>` : ''}` +
     `<small>${escapeHtml(properties.verification_note)}</small>`;
 }
@@ -151,7 +163,8 @@ function renderList(features) {
     item.className = 'result-item';
     item.dataset.id = p.search_id;
     item.innerHTML = `<div class="result-title"><strong>${escapeHtml(p.name)}</strong><span class="badge ${escapeHtml(p.confidence)}">${escapeHtml(p.confidence)}</span></div>` +
-      `<div class="result-meta">${escapeHtml(formatNumber(p.capacity_kw, 1))} kW · tetto ${escapeHtml(formatNumber(p.roof_area_m2))} m² · score ${escapeHtml(p.score)}/100<br>${escapeHtml(p.address || p.evidence || 'Posizione da verificare')}</div>`;
+      `<div class="result-meta">${p.capacity_kw ? `${escapeHtml(formatNumber(p.capacity_kw, 1))} kW · ` : ''}score ${escapeHtml(p.score)}/100<br>${escapeHtml(p.address || p.evidence || 'Posizione da verificare')}` +
+      `${p.official_registry ? '<br><span class="source-label">Registro ufficiale CMTo</span>' : ''}</div>`;
     item.addEventListener('click', () => focusResult(feature));
     container.appendChild(item);
   });
@@ -172,7 +185,6 @@ function renderSummary(features) {
   byId('detectedCount').textContent = features.length || '0';
   const capacity = features.reduce((sum, feature) => sum + (Number(feature.properties.capacity_kw) || 0), 0);
   byId('capacityTotal').textContent = capacity ? formatNumber(capacity, 1) : '0';
-  byId('highConfidenceCount').textContent = features.filter(feature => feature.properties.confidence === 'alta').length;
 }
 
 function toggleExports(enabled) {
@@ -207,7 +219,7 @@ async function analyze() {
     const geometry = area.features.length === 1
       ? area.features[0].geometry
       : { type: 'MultiPolygon', coordinates: area.features.flatMap(feature => feature.geometry.type === 'MultiPolygon' ? feature.geometry.coordinates : [feature.geometry.coordinates]) };
-    setStatus(`Cerco impianti fotovoltaici e tetti associati in ${code}…`, 'loading');
+    setStatus(`Incrocio registro FER ufficiale e segnali fotovoltaici OSM in ${code}…`, 'loading');
     const results = await fetchJson('/api/pv-search', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -220,7 +232,9 @@ async function analyze() {
     toggleExports(resultFeatures.length > 0);
     const partialNote = results.meta.partial ? ' Analisi parziale: alcuni tasselli non hanno risposto.' : '';
     setCoverage(results.meta, results.meta.partial ? 'partial' : 'complete');
-    setStatus(`Analisi completata: almeno ${results.meta.photovoltaicElements} segnali FV OSM e ${resultFeatures.length} tetti/impianti mappati.${partialNote}`,
+    const officialLabel = results.meta.officialFerElements === 1 ? 'impianto FER ufficiale' : 'impianti FER ufficiali';
+    const resultLabel = resultFeatures.length === 1 ? 'risultato unificato' : 'risultati unificati';
+    setStatus(`Analisi completata: ${results.meta.officialFerElements} ${officialLabel}, almeno ${results.meta.photovoltaicElements} segnali FV OSM, ${resultFeatures.length} ${resultLabel}.${partialNote}`,
       results.meta.partial ? 'warning' : '');
   } catch (error) {
     setCoverage(null, 'error');
@@ -243,17 +257,18 @@ function download(content, fileName, mimeType) {
   URL.revokeObjectURL(url);
 }
 function exportCsv() {
-  const headers = ['Cabina', 'Nome', 'Confidenza', 'Score', 'Potenza_kW', 'Fonte_potenza', 'Area_FV_m2', 'Area_tetto_m2', 'Moduli', 'Indirizzo', 'Evidenza_OSM', 'Lat', 'Lon', 'Riferimento_OSM', 'Note'];
+  const headers = ['Cabina', 'Nome', 'Tipo_impianto', 'Fonte_autorevole', 'Confidenza', 'Score', 'Potenza_kW', 'Fonte_potenza', 'Area_FV_m2', 'Area_tetto_m2', 'Moduli', 'Indirizzo', 'Evidenza', 'Data_autorizzazione', 'Codice_CMTo', 'Lat', 'Lon', 'Riferimento_OSM', 'Note'];
   const rows = resultFeatures.map(({ properties: p }) => [
-    p.cabina_cod_ac, p.name, p.confidence, p.score, p.capacity_kw, p.capacity_source, p.pv_area_m2,
-    p.roof_area_m2, p.modules, p.address, p.evidence, p.lat, p.lon, `${p.osm_type}/${p.osm_id}`, p.verification_note
+    p.cabina_cod_ac, p.name, p.plant_type, p.source_authority, p.confidence, p.score, p.capacity_kw, p.capacity_source, p.pv_area_m2,
+    p.roof_area_m2, p.modules, p.address, p.evidence, p.authorization_date, p.cmto_site_code, p.lat, p.lon,
+    p.osm_type && p.osm_id ? `${p.osm_type}/${p.osm_id}` : '', p.verification_note
   ]);
   const csv = '\ufeff' + [headers, ...rows].map(row => row.map(csvCell).join(';')).join('\n');
-  download(csv, `tetti_fotovoltaici_${activeCabinCode}_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
+  download(csv, `impianti_fer_${activeCabinCode}_${new Date().toISOString().slice(0, 10)}.csv`, 'text/csv;charset=utf-8');
 }
 function exportGeoJson() {
   download(JSON.stringify({ type: 'FeatureCollection', features: resultFeatures }, null, 2),
-    `tetti_fotovoltaici_${activeCabinCode}_${new Date().toISOString().slice(0, 10)}.geojson`, 'application/geo+json');
+    `impianti_fer_${activeCabinCode}_${new Date().toISOString().slice(0, 10)}.geojson`, 'application/geo+json');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {

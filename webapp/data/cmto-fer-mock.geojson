@@ -1,0 +1,31 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "geometry": { "type": "Point", "coordinates": [9.1005, 45.1005] },
+      "properties": {
+        "search_id": "cmto:demo-001",
+        "name": "Fotovoltaico autorizzato - Comune demo",
+        "detection_type": "impianto FER autorizzato (registro istituzionale)",
+        "confidence": "alta",
+        "score": 100,
+        "capacity_kw": null,
+        "capacity_source": "non disponibile nel dataset CMTo",
+        "pv_area_m2": null,
+        "roof_area_m2": null,
+        "modules": null,
+        "address": "Località demo",
+        "evidence": "Registro FER autorizzati CMTo · Fotovoltaico",
+        "verification_note": "Dato sintetico per test UI.",
+        "lat": 45.1005,
+        "lon": 9.1005,
+        "plant_type": "Fotovoltaico",
+        "source_authority": "Città Metropolitana di Torino",
+        "source_dataset": "Impianti FER autorizzati - demo",
+        "license": "CC BY 4.0",
+        "official_registry": true
+      }
+    }
+  ]
+}
